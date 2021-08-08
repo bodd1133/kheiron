@@ -1,0 +1,22 @@
+[
+    {
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "${log_group}",
+          "awslogs-region": "${region}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "entryPoint": [],
+      "command": [],
+      "environment": [
+        {
+          "name": "S3_BUCKET", "value": "${s3_bucket}"
+        }
+      ],
+      "memoryReservation": null,
+      "image": "${docker_image}:${docker_image_tag}",
+      "name": "${name}"
+    }
+  ]
