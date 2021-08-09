@@ -1,2 +1,2 @@
 boto3
-pyspark
+pyspark==3.0.0

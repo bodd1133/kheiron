@@ -3,3 +3,4 @@ terraform/terraform.tfstate.backup
 terraform/.terraform/*
 .terraform.lock.hcl
 python/__pycache__/*
+.python-version

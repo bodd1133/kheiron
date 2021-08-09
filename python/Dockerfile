@@ -5,3 +5,4 @@ COPY ./ .
 RUN pip3 install -r requirements.txt
 USER ${spark_uid}
 CMD ["python3", "./main.py"]
+

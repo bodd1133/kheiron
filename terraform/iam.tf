@@ -34,6 +34,17 @@ data "aws_iam_policy_document" "execution_policy_document" {
     ]
     resources = ["*"]
   }
+  statement {
+    sid    = "AllowSecretsManager"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:ListSecrets",
+      "secretsmanager:ListSecretVersionIds"
+    ]
+    resources = ["*"]
+  }
 }
 
 # ECS task role
