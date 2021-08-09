@@ -14,6 +14,8 @@ s3 = boto3.client('s3', config=config)
 pass_grades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-']
 req_fields = ["subject", "grade"]
 
+
+
 def find_most_popular_subjects(df):
     return df.groupBy('subject').count().sort(desc('count')).head(3)
 
@@ -24,13 +26,20 @@ def find_unique_subjects(df):
 def find_pass_rate_per_university(df):
     return df.groupby(['university', 'total_enrolments']).agg(count(when(col('course_passed') == True, True))).withColumnRenamed('count(CASE WHEN (course_passed = true) THEN true END)', 'pass_count').withColumn('prop_of_total', col('pass_count')/col('total_enrolments'))
 
+def replace_empty_string(x):
+    if x == "": 
+        return "0"
+    return x
+
+replace_empty_strings_udf = udf(replace_empty_string, StringType())
+
 def read_file_to_df(spark, s3_bucket, filepath):
     base_file_path = f's3a://{s3_bucket}/'
-    # base_file_path = 'file:///'
     file_type = re.search(regex, filepath).group(2)
     if file_type == 'csv':
         df = spark.read.option('header',True, ).format('csv').load(base_file_path + filepath)
         df = df.select([col(col).alias(col.replace(' ', '')) for col in df.columns]).select(req_fields)
+        df = df.withColumn('grade', replace_empty_strings_udf(col('grade')))
         print(df.columns)
     else:
         df = spark.read.format('json').load(base_file_path + filepath).select(req_fields)
@@ -54,7 +63,6 @@ def add_pass_col(df):
     return df.withColumn('course_passed', calculate_pass_udf(col('grade')))
 
 def get_file_paths(s3_bucket):
-    # return [[ "../data/uni1.csv", "../data/uni2.csv", "../data/uni3.json" ]]
     keys = []
     paginator = s3.get_paginator('list_objects_v2')
     pages = paginator.paginate(Bucket=s3_bucket, Prefix='data')
@@ -66,7 +74,6 @@ def get_file_paths(s3_bucket):
 def get_spark_session():
     spark = (
         SparkSession.builder.appName('uni_data_analysis')
-        .config('spark.executorEnv.PYTHONHASHSEED', '0')
         .getOrCreate()
     )
     return spark

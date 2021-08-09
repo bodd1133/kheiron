@@ -7,3 +7,9 @@ deploy-image:
 	docker tag $(REPO)-agent:latest $(URI):latest
 	docker push $(URI):latest
 
+test: 
+	virtualenv ./.venv; source ./.venv/bin/activate; \
+	cd python && pip3 install -r ./requirements.txt; pytest ./test/
+
+test-clean:
+	rm -rf ./.venv .pytest_cache; cd python; rm -rf __pycache__ .pytest_cache; cd test; rm -rf __pycache__ .pytest_cache
