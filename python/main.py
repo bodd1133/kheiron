@@ -1,10 +1,11 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import when, count, col, desc, countDistinct, lit, udf
+from pyspark.sql.functions import when, count, col, desc, countDistinct, lit, udf, trim
 from pyspark.sql.types import BooleanType, StructType, StringType, StructField
 import boto3
 from botocore.config import Config
 import re
 import os
+import json
 
 regex = r'data/([A-Za-z0-9\-]*).([A-Za-z0-9\-]*)'
 
@@ -26,14 +27,15 @@ def find_pass_rate_per_university(df):
 
 def read_file_to_df(spark, s3_bucket, filepath):
     base_file_path = f's3a://{s3_bucket}/'
-    # base_file_path = 'file:///'
     file_type = re.search(regex, filepath).group(2)
     if file_type == 'csv':
-        df = spark.read.option('header',True, ).format('csv').load(base_file_path + filepath)
-        df = df.select([col(col).alias(col.replace(' ', '')) for col in df.columns]).select(req_fields)
-        print(df.columns)
+        df = spark.read.option('header',True).format('csv').load(base_file_path + filepath)
+        df = df.select([col(cl).alias(cl.replace(' ', '')) for cl in df.columns]).select(req_fields)
     else:
-        df = spark.read.format('json').load(base_file_path + filepath).select(req_fields)
+        df = spark.read.option("multiline",True).option("primitivesAsString", True).format('json').load(base_file_path + filepath).select(req_fields)
+    for field in req_fields:
+        df = df.withColumn(field, trim(col(field)))
+    df = df.filter(col("subject") != "subject")
     uni_name = re.search(regex, filepath).group(1)
     return df.withColumn('university', lit(uni_name)).withColumn('total_enrolments', lit(df.count()))
 
@@ -51,22 +53,23 @@ def calculate_pass(x):
 calculate_pass_udf = udf(calculate_pass, BooleanType())
 
 def add_pass_col(df): 
+
     return df.withColumn('course_passed', calculate_pass_udf(col('grade')))
 
 def get_file_paths(s3_bucket):
-    # return [[ "../data/uni1.csv", "../data/uni2.csv", "../data/uni3.json" ]]
-    keys = []
-    paginator = s3.get_paginator('list_objects_v2')
-    pages = paginator.paginate(Bucket=s3_bucket, Prefix='data')
-    for page in pages:
-        if 'Contents' in page:
-            keys += [ obj['Key'] for obj in page['Contents'] if obj['Key'].rindex('/') != len(obj['Key']) - 1 ]
-    return keys
+    return ["data/uni1.csv", "data/uni2.csv", "data/uni3.json"]
+    # keys = []
+    # , 
+    # paginator = s3.get_paginator('list_objects_v2')
+    # pages = paginator.paginate(Bucket=s3_bucket, Prefix='data')
+    # for page in pages:
+    #     if 'Contents' in page:
+    #         keys += [ obj['Key'] for obj in page['Contents'] if obj['Key'].rindex('/') != len(obj['Key']) - 1 ]
+    # return keys
 
 def get_spark_session():
     spark = (
         SparkSession.builder.appName('uni_data_analysis')
-        .config('spark.executorEnv.PYTHONHASHSEED', '0')
         .getOrCreate()
     )
     return spark
@@ -74,43 +77,41 @@ def get_spark_session():
 def process_files():
     s3_bucket = os.getenv('S3_BUCKET')
     # aws_access_key = os.getenv('AWS_ACCESS_KEY')
-    # aws_secrey_key = os.getenv('AWS_SECRET_KEY')
+    # aws_secret_key = os.getenv('AWS_SECRET_KEY')
+
     # get spark session
     spark = get_spark_session()
-    print(spark)
+
     #  get all filepaths to be analysed
     file_paths = get_file_paths(s3_bucket)
-    print(file_paths)
     schema = StructType([
         StructField('subject', StringType()),
         StructField('grade', StringType()),
         StructField('university', StringType()),
-        StructField('total_enrolments', StringType())
+        StructField('total_enrolments', StringType()),
+        StructField('course_passed', BooleanType())
     ])
     
     df = spark.createDataFrame([], schema)
-    print(df.count())
+
     # load each data file into same dataframe
     for filepath in file_paths:
-        print(s3_bucket)
-        print('green')
-        print(filepath)
         uni_df = read_file_to_df(spark, s3_bucket, filepath)
-        uni_df.show()
         df_with_pass = add_pass_col(uni_df)
         df_with_pass.show()
         df = df.union(df_with_pass)
-        print(df.count())
-        print('yello')
-        df.show()
 
     # run analysis on full datafame 
-    most_popular_courses_df = find_most_popular_subjects(df)
-    most_popular_courses_df.show()
+    most_popular_courses = find_most_popular_subjects(df)
+    print(most_popular_courses)
+    print("popuar?")
     unique_subjects_df = find_unique_subjects(df)
-    unique_subjects_df.show()
+    print('here?')
+    print(unique_subjects_df.count())
+    print(unique_subjects_df.collect())
+    print("pass_rate")
     pass_rate_df = find_pass_rate_per_university(df)
-    pass_rate_df.show()
+    print(pass_rate_df.collect())
 
     spark.stop()
     
