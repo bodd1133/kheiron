@@ -1,6 +1,7 @@
 REPO=rlb-tech-test
 
 deploy-image:
+	virtualenv ./.venv; source ./.venv/bin/activate; 
 	$(eval URI := $(shell aws ecr describe-repositories --repository-names $(REPO) | jq -r '.repositories[0] | .repositoryUri'))
 	aws ecr get-login-password | docker login --password-stdin --username AWS $(URI)
 	cd python && docker build . -t $(REPO)-agent

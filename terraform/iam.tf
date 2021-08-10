@@ -41,7 +41,8 @@ data "aws_iam_policy_document" "execution_policy_document" {
       "secretsmanager:GetSecretValue",
       "secretsmanager:DescribeSecret",
       "secretsmanager:ListSecrets",
-      "secretsmanager:ListSecretVersionIds"
+      "secretsmanager:ListSecretVersionIds",
+      "kms:Decrypt"
     ]
     resources = ["*"]
   }
