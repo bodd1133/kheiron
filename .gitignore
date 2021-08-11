@@ -4,3 +4,5 @@ terraform/.terraform/*
 .terraform.lock.hcl
 python/__pycache__/*
 .python-version
+python/test/__pycache__
+python/test/__pycache__/*

@@ -13,11 +13,11 @@
       "secrets": [
         {
           "name": "AWS_ACCESS_KEY",
-          "valueFrom": "/aws_access_key"
+          "valueFrom": "/access_key"
         },
         {
           "name": "AWS_SECRET_KEY",
-          "valueFrom": "/aws_secret_key"
+          "valueFrom": "/secret_key"
         }
       ],
       "environment": [

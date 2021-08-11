@@ -5,7 +5,7 @@ import boto3
 from botocore.config import Config
 import re
 import os
-import json
+from datetime import datetime
 
 regex = r'data/([A-Za-z0-9\-]*).([A-Za-z0-9\-]*)'
 
@@ -79,12 +79,17 @@ def get_spark_session(aws_access_key, aws_secret_key):
         .getOrCreate()
     )
     spark.sparkContext._jsc.hadoopConfiguration().set(
-        'fs.s3a.secret.key', aws_access_key,
+        'fs.s3a.secret.key', aws_secret_key
     )
     spark.sparkContext._jsc.hadoopConfiguration().set(
-        'fs.s3a.access.key', aws_secret_key,
+        'fs.s3a.access.key', aws_access_key
     )
     return spark
+
+def save_to_s3_csv(df, prefix, bucket):
+    y, m, d, hr, minute = datetime.strftime(datetime.now(), "%Y-%m-%d-%H-%M").split("-")
+    s3_path = f"s3a://{bucket}/output/{prefix}/y={y}/m={m}/d={d}/h={hr}/min={minute}/"
+    return df.coalesce(1).write.mode("append").format("csv").save(s3_path, header=True)
 
 def process_files():
     s3_bucket = os.getenv('S3_BUCKET')
@@ -116,12 +121,16 @@ def process_files():
     # run analysis on full datafame 
     most_popular_courses = find_most_popular_subjects(df)
     print(f"Most popular course: {most_popular_courses}")
+    most_popular_courses_df = spark.createDataFrame(most_popular_courses)
+    save_to_s3_csv(most_popular_courses_df, "popular_subjects", s3_bucket)
     unique_subjects_df = find_unique_subjects(df)
     num_unique_subjects = unique_subjects_df.count()
+    save_to_s3_csv(unique_subjects_df, "unique_subjects", s3_bucket)
     print(f" Number of unique_subjects: {num_unique_subjects}")
     unique_subjects = unique_subjects_df.collect()
     print(f"Unique subjects: {unique_subjects}")
     pass_rate_df = find_pass_rate_per_university(df)
+    save_to_s3_csv(pass_rate_df, "pass_rate", s3_bucket)
     pass_rate = pass_rate_df.collect()
     print(f"Pass Rate: {pass_rate}")
 
